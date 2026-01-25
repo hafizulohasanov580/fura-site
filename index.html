@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master PRO | Truck Service System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --accent: #f97316; 
+            --glass: rgba(15, 23, 42, 0.85);
+            --border: rgba(255, 255, 255, 0.15);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; padding: 0; color: white;
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+                        url('https://images.unsplash.com/photo-1586191121264-1e846d9a8c02?q=80&w=2070&auto=format&fit=crop') no-repeat center center fixed;
+            background-size: cover;
+            min-height: 100vh;
+        }
+
+        #loginScreen, #appScreen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+        #appScreen { display: none; justify-content: flex-start; padding-top: 40px; }
+
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6);
+        }
+
+        .wide-card { max-width: 900px; }
+
+        h1, h2 { margin: 0; font-weight: 800; }
+        .accent-text { color: var(--accent); }
+
+        /* Поля ввода */
+        .input-group { display: grid; grid-template-columns: 2fr 1fr auto; gap: 12px; margin-top: 20px; }
+        input {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            padding: 14px;
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+            transition: 0.2s;
+        }
+        input:focus { border-color: var(--accent); background: rgba(255,255,255,0.15); }
+
+        /* Кнопки */
+        .btn-main {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+        .btn-main:hover { transform: translateY(-2px); box-shadow: 0 10px 20px -5px rgba(249, 115, 22, 0.5); }
+
+        .btn-google {
+            background: white; color: #1e293b; padding: 16px; border-radius: 14px;
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            gap: 12px; width: 100%; font-weight: 700; font-size: 16px; margin: 20px 0;
+        }
+
+        /* Таблица */
+        .table-wrap { margin-top: 25px; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; background: rgba(0,0,0,0.3); }
+        th { background: rgba(255,255,255,0.1); padding: 15px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #cbd5e1; }
+        td { padding: 15px; border-top: 1px solid var(--border); font-size: 15px; }
+
+        .total-panel {
+            margin-top: 20px; padding: 20px; background: var(--accent);
+            border-radius: 16px; display: flex; justify-content: space-between;
+            align-items: center; font-weight: 800; font-size: 22px;
+        }
+
+        .actions-footer { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-sec { background: rgba(255,255,255,0.1); color: white; border: 1px solid var(--border); padding: 10px 15px; border-radius: 10px; cursor: pointer; font-size: 13px; }
+
+        /* PDF Area */
+        #printArea { background: white; color: black; padding: 20mm; width: 210mm; display: none; }
+        #printArea table { width: 100%; border: 1px solid #000; color: black; background: white; }
+        #printArea th, #printArea td { border: 1px solid #000; padding: 10px; }
+
+        @media (max-width: 768px) {
+            .input-group { grid-template-columns: 1fr; }
+            .total-panel { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loginScreen">
+        <div class="glass-card" style="text-align:center;">
+            <h1>MASTER <span class="accent-text">PRO</span></h1>
+            <p style="opacity: 0.6;">Грузовой автосервис & учет</p>
+            
+            <button class="btn-google" id="loginBtn">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/pwa/google.svg" width="20">
+                Войти через Google
+            </button>
+
+            <div id="passBlock" style="display:none;">
+                <p id="passHint">Введите код доступа:</p>
+                <input type="password" id="secretPass" placeholder="****" style="text-align:center; margin-bottom:15px;">
+                <button class="btn-main" style="width:100%" onclick="handlePassword()">Открыть систему</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="appScreen">
+        <div class="glass-card wide-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 id="userNameHeader">Панель управления</h2>
+                <button onclick="logout()" class="btn-sec">Выход</button>
+            </div>
+
+            <div class="input-group">
+                <input type="text" id="itemInput" list="suggestions" placeholder="Что починили? (напр. Обед)">
+                <datalist id="suggestions"></datalist>
+                
+                <input type="number" id="priceInput" placeholder="Сумма">
+                <button class="btn-main" id="addBtn">Добавить</button>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Дата</th><th>Описание работ</th><th>Сумма</th></tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+
+            <div class="total-panel">
+                <span>ИТОГО К ОПЛАТЕ:</span>
+                <span id="totalSum">0 смн</span>
+            </div>
+
+            <div class="actions-footer">
+                <button class="btn-main" style="flex:2" onclick="downloadPDF()">⬇️ Скачать отчет PDF</button>
+                <button class="btn-sec" style="flex:1" onclick="changePassword()">⚙️ Сменить код</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="printArea">
+        <h1 style="text-align:center;">ОТЧЕТ ПО РАБОТАМ</h1>
+        <p>Мастер: <span id="masterNamePDF"></span></p>
+        <div id="tablePDF"></div>
+        <h2 style="text-align:right; margin-top:20px;">Итого: <span id="totalPDF"></span></h2>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBo5nsIBswK0NnQS89QdsD517Xqbd_jK2U",
+            authDomain: "dyadya-app.firebaseapp.com",
+            projectId: "dyadya-app",
+            storageBucket: "dyadya-app.firebasestorage.app",
+            messagingSenderId: "396455935954",
+            appId: "1:396455935954:web:933d06290ce7642099d20b"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        let userObj = null;
+
+        document.getElementById('loginBtn').onclick = () => signInWithPopup(auth, provider);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userObj = user;
+                document.getElementById('loginBtn').style.display = 'none';
+                document.getElementById('passBlock').style.display = 'block';
+                const saved = localStorage.getItem('pwd_' + user.uid);
+                if(!saved) document.getElementById('passHint').innerText = "Придумайте ваш секретный код:";
+            }
+        });
+
+        window.handlePassword = function() {
+            const val = document.getElementById('secretPass').value.trim();
+            const key = 'pwd_' + userObj.uid;
+            const saved = localStorage.getItem(key);
+            if (!saved) { localStorage.setItem(key, val); enterApp(); }
+            else if (val === saved) { enterApp(); }
+            else { alert("Неверный код!"); }
+        };
+
+        function enterApp() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('appScreen').style.display = 'flex';
+            document.getElementById('userNameHeader').innerText = userObj.displayName;
+            loadData(userObj.uid);
+        }
+
+        window.logout = () => signOut(auth).then(() => location.reload());
+        
+        window.changePassword = () => {
+            const p = prompt("Введите новый секретный код:");
+            if(p && p.trim()) {
+                localStorage.setItem('pwd_' + userObj.uid, p.trim());
+                alert("Код успешно изменен!");
+            }
+        };
+
+        function format(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+
+        document.getElementById('addBtn').onclick = async () => {
+            const desc = document.getElementById('itemInput').value;
+            const price = parseFloat(document.getElementById('priceInput').value);
+            if (desc && price) {
+                await addDoc(collection(db, "expenses"), { uid: userObj.uid, desc, price, date: new Date() });
+                document.getElementById('itemInput').value = ""; document.getElementById('priceInput').value = "";
+            }
+        };
+
+        function loadData(uid) {
+            const q = query(collection(db, "expenses"), orderBy("date", "asc"));
+            onSnapshot(q, (snapshot) => {
+                const body = document.getElementById('tableBody');
+                const suggest = document.getElementById('suggestions');
+                body.innerHTML = ""; suggest.innerHTML = "";
+                let total = 0;
+                let historyWords = new Set();
+
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    if(d.uid === uid) {
+                        const row = body.insertRow();
+                        row.innerHTML = `<td>${d.date.toDate().toLocaleDateString()}</td><td>${d.desc}</td><td>${format(d.price)} смн</td>`;
+                        total += d.price;
+                        historyWords.add(d.desc);
+                    }
+                });
+
+                // Возвращаем словарь подсказок
+                historyWords.forEach(word => {
+                    let opt = document.createElement('option');
+                    opt.value = word;
+                    suggest.appendChild(opt);
+                });
+
+                document.getElementById('totalSum').innerText = format(total) + " смн";
+            });
+        }
+
+        window.downloadPDF = function() {
+            const area = document.getElementById('printArea');
+            document.getElementById('masterNamePDF').innerText = userObj.displayName;
+            document.getElementById('tablePDF').innerHTML = document.querySelector('table').outerHTML;
+            document.getElementById('totalPDF').innerText = document.getElementById('totalSum').innerText;
+            area.style.display = 'block';
+            html2pdf().set({ margin: 10, filename: 'Otchet_Mastera.pdf' }).from(area).save().then(()=>area.style.display='none');
+        }
+    </script>
+</body>
+</html>
