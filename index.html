@@ -3,56 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Master PRO | Truck Service System</title>
+    <title>Master PRO | Truck Service</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root { --accent: #f97316; --glass: rgba(15, 23, 42, 0.9); --border: rgba(255, 255, 255, 0.15); }
         body { 
             font-family: 'Inter', sans-serif; margin: 0; padding: 0; color: white;
-            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
-                        url('https://images.unsplash.com/photo-1586191121264-1e846d9a8c02?auto=format&fit=crop&w=1200') no-repeat center center fixed;
-            background-size: cover; min-height: 100vh;
+            background: #0f172a; min-height: 100vh;
         }
-        .container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; box-sizing: border-box; }
+        .container { display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .glass-card { 
             background: var(--glass); backdrop-filter: blur(20px); border: 1px solid var(--border); 
-            border-radius: 24px; padding: 30px; width: 100%; max-width: 800px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); 
+            border-radius: 24px; padding: 30px; width: 100%; max-width: 800px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); 
         }
-        h1 { font-weight: 800; text-align: center; margin-bottom: 10px; }
-        .accent-text { color: var(--accent); }
-        .btn-main { background: var(--accent); color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.3s; width: 100%; }
+        h1 { font-weight: 800; text-align: center; color: var(--accent); }
+        .btn-main { background: var(--accent); color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 700; cursor: pointer; width: 100%; }
         .btn-google { background: white; color: #1e293b; padding: 16px; border-radius: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; font-weight: 700; margin-bottom: 20px; }
-        input { background: rgba(255,255,255,0.1); border: 1px solid var(--border); padding: 12px; border-radius: 10px; color: white; outline: none; width: 100%; box-sizing: border-box; }
+        input { background: rgba(255,255,255,0.1); border: 1px solid var(--border); padding: 12px; border-radius: 10px; color: white; width: 100%; box-sizing: border-box; }
         .input-group { display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th { background: rgba(255,255,255,0.05); padding: 12px; text-align: left; font-size: 12px; color: #94a3b8; border-bottom: 1px solid var(--border); }
-        td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
-        .total-panel { margin-top: 20px; padding: 20px; background: var(--accent); border-radius: 15px; display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 20px; }
-        #loginScreen { display: flex; }
-        #appScreen { display: none; }
-        @media (max-width: 600px) { .input-group { grid-template-columns: 1fr; } }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; color: black; border-radius: 8px; overflow: hidden; }
+        th { background: #e2e8f0; padding: 12px; text-align: left; color: #475569; }
+        td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+        .total-panel { margin-top: 20px; padding: 20px; background: var(--accent); border-radius: 15px; display: flex; justify-content: space-between; font-weight: 800; font-size: 20px; }
+        #loginScreen { display: flex; justify-content: center; align-items: center; height: 100vh; }
     </style>
 </head>
 <body>
 
-    <div class="container" id="loginScreen">
+    <div id="loginScreen">
         <div class="glass-card" style="max-width: 400px; text-align: center;">
-            <h1>MASTER <span class="accent-text">PRO</span></h1>
-            <p style="opacity: 0.7; margin-bottom: 30px;">Грузовой автосервис & учет</p>
+            <h1>MASTER PRO</h1>
             <button class="btn-google" id="loginBtn">
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/pwa/google.svg" width="20">
-                Войти через аккаунт Google
+                Войти через Google
             </button>
         </div>
     </div>
 
-    <div class="container" id="appScreen">
+    <div class="container" id="appScreen" style="display: none;">
         <div class="glass-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h2 id="userNameHeader">Панель управления</h2>
-                <button onclick="location.reload()" style="background:none; border:none; color:white; cursor:pointer; opacity:0.5;">Выйти</button>
-            </div>
+            <h2 id="userNameHeader">Панель управления</h2>
             
             <div class="input-group">
                 <input type="text" id="itemInput" placeholder="Что сделали?">
@@ -60,18 +51,18 @@
                 <button class="btn-main" id="addBtn" style="width: auto; padding: 0 25px;">+</button>
             </div>
 
-            <div style="overflow-x: auto;">
-                <table id="myTable">
-                    <thead><tr><th>Дата</th><th>Описание</th><th>Сумма</th></tr></thead>
+            <div id="pdfContent">
+                <table>
+                    <thead><tr><th>Дата</th><th>Описание работы</th><th>Сумма</th></tr></thead>
                     <tbody id="tableBody"></tbody>
                 </table>
+                <div class="total-panel">
+                    <span>ИТОГО К ОПЛАТЕ:</span>
+                    <span id="totalSum">0 смн</span>
+                </div>
             </div>
-
-            <div class="total-panel">
-                <span>ИТОГО К ОПЛАТЕ:</span>
-                <span id="totalSum">0 смн</span>
-            </div>
-            <button class="btn-main" style="margin-top:20px; background:rgba(255,255,255,0.1);" onclick="downloadPDF()">⬇️ Скачать отчет PDF</button>
+            
+            <button class="btn-main" style="margin-top:20px; background:#334155;" onclick="downloadPDF()">⬇️ Скачать отчет PDF (A4)</button>
         </div>
     </div>
 
@@ -95,16 +86,14 @@
         const provider = new GoogleAuthProvider();
         let userObj = null;
 
-        document.getElementById('loginBtn').onclick = () => {
-            signInWithPopup(auth, provider).catch(err => alert("Ошибка: " + err.message));
-        };
+        document.getElementById('loginBtn').onclick = () => signInWithPopup(auth, provider);
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 userObj = user;
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('appScreen').style.display = 'flex';
-                document.getElementById('userNameHeader').innerText = user.displayName;
+                document.getElementById('userNameHeader').innerText = "Мастер: " + user.displayName;
                 loadData(user.uid);
             }
         });
@@ -141,8 +130,8 @@
         }
 
         window.downloadPDF = () => {
-            const element = document.getElementById('appScreen');
-            const opt = { margin: 10, filename: 'Otchet_Mastera.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+            const element = document.getElementById('pdfContent');
+            const opt = { margin: 10, filename: 'Master_Report.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
             html2pdf().from(element).set(opt).save();
         };
     </script>
