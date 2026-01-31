@@ -30,8 +30,12 @@
         .btn-link { background: none; border: none; color: #94a3b8; cursor: pointer; text-decoration: underline; font-size: 11px; }
 
         #pdf-ui { display: none; background: white; color: black; padding: 30px; }
-        #pdf-ui table { width: 100%; border: 1px solid black; border-collapse: collapse; }
+        #pdf-ui table { width: 100%; border: 1px solid black; border-collapse: collapse; page-break-inside: auto; }
+        #pdf-ui table tr { page-break-inside: avoid; }
         #pdf-ui td, #pdf-ui th { border: 1px solid black; padding: 8px; color: black; }
+
+        .action-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; margin: 0 5px; }
+        .edit-input { width: 100%; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -71,7 +75,7 @@
         </div>
 
         <table>
-            <thead><tr><th>Дата / Время</th><th>Описание</th><th>Сумма</th></tr></thead>
+            <thead><tr><th>Дата / Время</th><th>Описание</th><th>Сумма</th><th>Действия</th></tr></thead>
             <tbody id="table-body"></tbody>
         </table>
 
@@ -82,13 +86,12 @@
 
         <div class="nav-btns">
             <button class="btn-sec" id="btn-pdf">⬇️ Скачать PDF</button>
-            <button class="btn-sec" style="color: #ef4444;" id="btn-clear">🗑️ Очистить</button>
         </div>
     </div>
 </div>
 
 <div id="pdf-ui">
-    <h1 style="text-align:center;">ОТЧЕТ МАСТЕРА</h1>
+    <h1 id="pdf-title" style="text-align:center;">ОТЧЕТ МАСТЕРА</h1>
     <p id="pdf-master"></p>
     <div id="pdf-table"></div>
     <h2 style="text-align:right; margin-top:20px;">Итого: <span id="pdf-total"></span></h2>
@@ -97,7 +100,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, getDocs, deleteDoc, doc, where } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, getDocs, deleteDoc, doc, where, updateDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBo5nsIBswK0NnQS89QdsD517Xqbd_jK2U",
@@ -114,6 +117,7 @@
     const provider = new GoogleAuthProvider();
 
     let currentUser = null;
+    let currentMonthYear = '';
 
     function formatNumber(num) {
         return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -207,10 +211,14 @@
                     const dateStr = dateObj.toLocaleDateString();
                     const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
-                    const row = `<tr>
+                    const row = `<tr data-id="${docSnap.id}">
                         <td>${dateStr} <br><span class="time-col">${timeStr}</span></td>
                         <td>${d.desc}</td>
                         <td>${formatNumber(d.price)} смн</td>
+                        <td>
+                            <button class="action-btn" onclick="editRow(this)">Изменить</button>
+                            <button class="action-btn" onclick="deleteRow('${docSnap.id}')">Удалить</button>
+                        </td>
                     </tr>`;
                     body.innerHTML += row;
                     total += d.price;
@@ -218,26 +226,95 @@
                 }
             });
 
+            // Обновить текущий месяц/год на основе самой новой записи
+            if (snap.docs.length > 0) {
+                const latestDoc = snap.docs[0].data();
+                const dateObj = latestDoc.date.toDate();
+                const monthNames = ["ЯНВАРЯ", "ФЕВРАЛЯ", "МАРТА", "АПРЕЛЯ", "МАЯ", "ИЮНЯ", "ИЮЛЯ", "АВГУСТА", "СЕНТЯБРЯ", "ОКТЯБРЯ", "НОЯБРЯ", "ДЕКАБРЯ"];
+                currentMonthYear = monthNames[dateObj.getMonth()] + ' ' + dateObj.getFullYear();
+            } else {
+                currentMonthYear = '';
+            }
+
             words.forEach(w => history.innerHTML += `<option value="${w}">`);
             document.getElementById('total-sum').innerText = formatNumber(total) + " смн";
         });
     }
 
-    document.getElementById('btn-pdf').onclick = () => {
-        const ui = document.getElementById('pdf-ui');
-        document.getElementById('pdf-master').innerText = "Мастер: " + currentUser.displayName;
-        document.getElementById('pdf-table').innerHTML = "<table>" + document.querySelector('table').innerHTML + "</table>";
-        document.getElementById('pdf-total').innerText = document.getElementById('total-sum').innerText;
-        ui.style.display = 'block';
-        html2pdf().from(ui).save().then(() => ui.style.display = 'none');
+    window.editRow = function(btn) {
+        const row = btn.closest('tr');
+        const descCell = row.cells[1];
+        const priceCell = row.cells[2];
+        const actionsCell = row.cells[3];
+
+        const originalDesc = descCell.innerText;
+        const originalPrice = priceCell.innerText.replace(' смн', '').replace(/\./g, '');
+
+        descCell.innerHTML = `<input class="edit-input" type="text" value="${originalDesc}">`;
+        priceCell.innerHTML = `<input class="edit-input" type="number" value="${originalPrice}">`;
+        actionsCell.innerHTML = `
+            <button class="action-btn" onclick="saveRow('${row.dataset.id}', this)">Сохранить</button>
+            <button class="action-btn" onclick="cancelEdit(this, '${originalDesc}', '${originalPrice}')">Отмена</button>
+        `;
     };
 
-    document.getElementById('btn-clear').onclick = async () => {
-        if(confirm("Удалить всю историю?")) {
-            const q = query(collection(db, "expenses"), where("uid", "==", currentUser.uid));
-            const snap = await getDocs(q);
-            await Promise.all(snap.docs.map(d => deleteDoc(doc(db, "expenses", d.id))));
+    window.saveRow = async function(id, btn) {
+        const row = btn.closest('tr');
+        const descInput = row.cells[1].querySelector('input');
+        const priceInput = row.cells[2].querySelector('input');
+
+        const newDesc = descInput.value.trim();
+        const newPrice = parseFloat(priceInput.value);
+
+        if (newDesc && newPrice) {
+            await updateDoc(doc(db, "expenses", id), { desc: newDesc, price: newPrice });
         }
+    };
+
+    window.cancelEdit = function(btn, originalDesc, originalPrice) {
+        const row = btn.closest('tr');
+        row.cells[1].innerHTML = originalDesc;
+        row.cells[2].innerHTML = formatNumber(originalPrice) + ' смн';
+        row.cells[3].innerHTML = `
+            <button class="action-btn" onclick="editRow(this)">Изменить</button>
+            <button class="action-btn" onclick="deleteRow('${row.dataset.id}')">Удалить</button>
+        `;
+    };
+
+    window.deleteRow = async function(id) {
+        if (confirm("Удалить эту запись?")) {
+            await deleteDoc(doc(db, "expenses", id));
+        }
+    };
+
+    document.getElementById('btn-pdf').onclick = () => {
+        const ui = document.getElementById('pdf-ui');
+        document.getElementById('pdf-title').innerText = currentMonthYear ? "ОТЧЕТ ЗА " + currentMonthYear : "ОТЧЕТ МАСТЕРА";
+        document.getElementById('pdf-master').innerText = "Мастер: " + currentUser.displayName;
+        
+        // Копировать таблицу без столбца "Действия"
+        const originalTable = document.querySelector('table');
+        const pdfTable = originalTable.cloneNode(true);
+        if (pdfTable.querySelector('thead tr th:last-child')) {
+            pdfTable.querySelector('thead tr th:last-child').remove();
+        }
+        pdfTable.querySelectorAll('tbody tr').forEach(tr => {
+            if (tr.lastElementChild) tr.lastElementChild.remove();
+        });
+        // Добавить inline стили для разбивания
+        pdfTable.style.pageBreakInside = 'auto';
+        pdfTable.querySelectorAll('tr').forEach(tr => tr.style.pageBreakInside = 'avoid');
+        document.getElementById('pdf-table').innerHTML = pdfTable.outerHTML;
+        
+        document.getElementById('pdf-total').innerText = document.getElementById('total-sum').innerText;
+        ui.style.display = 'block';
+        html2pdf().set({
+            margin: 0.5,
+            filename: 'report.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 3, useCORS: true },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        }).from(ui).save().then(() => ui.style.display = 'none');
     };
 </script>
 </body>
