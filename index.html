@@ -85,7 +85,7 @@
         </div>
 
         <div class="nav-btns">
-            <button class="btn-sec" id="btn-pdf">⬇️ Скачать PDF</button>
+            <button class="btn-sec" id="btn-pdf">⬇️ Скачать TXT</button>
         </div>
     </div>
 </div>
@@ -120,7 +120,10 @@
     let currentMonthYear = '';
 
     function formatNumber(num) {
-        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        // безопасное форматирование числа, возвращаем '0' для нечисловых значений
+        const n = Number(num);
+        if (!isFinite(n)) return '0';
+        return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
     }
 
     // --- ЛОГИКА ВХОДА И ПАРОЛЯ ---
@@ -203,26 +206,29 @@
             history.innerHTML = "";
             let total = 0;
             let words = new Set();
-
+ 
             snap.forEach(docSnap => {
                 const d = docSnap.data();
                 if(d.uid === uid) {
                     const dateObj = d.date.toDate();
                     const dateStr = dateObj.toLocaleDateString();
                     const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
+ 
+                    // безопасный вывод суммы (если d.price некорректен — покажем 0)
+                    const priceNum = Number(d.price);
+                    const priceDisplay = isFinite(priceNum) ? formatNumber(priceNum) + ' смн' : '0 смн';
                     const row = `<tr data-id="${docSnap.id}">
                         <td>${dateStr} <br><span class="time-col">${timeStr}</span></td>
                         <td>${d.desc}</td>
-                        <td>${formatNumber(d.price)} смн</td>
+                        <td>${priceDisplay}</td>
                         <td>
                             <button class="action-btn" onclick="editRow(this)">Изменить</button>
                             <button class="action-btn" onclick="deleteRow('${docSnap.id}')">Удалить</button>
                         </td>
                     </tr>`;
                     body.innerHTML += row;
-                    total += d.price;
-                    words.add(d.desc);
+                    if (isFinite(priceNum)) total += priceNum;
+                     words.add(d.desc);
                 }
             });
 
@@ -288,34 +294,43 @@
     };
 
     document.getElementById('btn-pdf').onclick = () => {
-        const ui = document.getElementById('pdf-ui');
-        document.getElementById('pdf-title').innerText = currentMonthYear ? "ОТЧЕТ ЗА " + currentMonthYear : "ОТЧЕТ МАСТЕРА";
-        document.getElementById('pdf-master').innerText = "Мастер: " + currentUser.displayName;
-        
-        // Копировать таблицу без столбца "Действия"
-        const originalTable = document.querySelector('table');
-        const pdfTable = originalTable.cloneNode(true);
-        if (pdfTable.querySelector('thead tr th:last-child')) {
-            pdfTable.querySelector('thead tr th:last-child').remove();
-        }
-        pdfTable.querySelectorAll('tbody tr').forEach(tr => {
-            if (tr.lastElementChild) tr.lastElementChild.remove();
-        });
-        // Добавить inline стили для разбивания
-        pdfTable.style.pageBreakInside = 'auto';
-        pdfTable.querySelectorAll('tr').forEach(tr => tr.style.pageBreakInside = 'avoid');
-        document.getElementById('pdf-table').innerHTML = pdfTable.outerHTML;
-        
-        document.getElementById('pdf-total').innerText = document.getElementById('total-sum').innerText;
-        ui.style.display = 'block';
-        html2pdf().set({
-            margin: 0.5,
-            filename: 'report.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 3, useCORS: true },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-        }).from(ui).save().then(() => ui.style.display = 'none');
-    };
+         if (!currentUser) { alert('Сначала войдите'); return; }
+         const title = currentMonthYear ? 'ОТЧЕТ ЗА ' + currentMonthYear : 'ОТЧЕТ МАСТЕРА';
+         const master = 'Мастер: ' + currentUser.displayName;
+         const lines = [];
+         lines.push(title);
+         lines.push(master);
+         lines.push('');
+        lines.push('Дата/Время\tОписание\tСумма (смн)');
+  
+         let totalNum = 0;
+  
+         document.querySelectorAll('#table-body tr').forEach(tr => {
+             const dateCell = (tr.cells[0] && tr.cells[0].innerText) ? tr.cells[0].innerText.replace(/\s+/g, ' ').trim() : '';
+             const desc = (tr.cells[1] && tr.cells[1].innerText) ? tr.cells[1].innerText.trim() : '';
+             const priceText = (tr.cells[2] && tr.cells[2].innerText) ? tr.cells[2].innerText.trim() : '';
+             // Удаляем нечисловые символы для суммирования
+             const numStr = priceText.replace(/[^\d,.\-]/g, '').replace(/\./g, '').replace(',', '.');
+             const num = parseFloat(numStr) || 0;
+             totalNum += num;
+            // В файл записываем только отображаемую сумму (без повторного числового столбца)
+            lines.push(`${dateCell}\t${desc}\t${priceText}`);
+         });
+  
+         lines.push('');
+         const formattedTotal = formatNumber(totalNum) + ' смн';
+         lines.push('Итого: ' + formattedTotal);
+  
+         const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' });
+         const url = URL.createObjectURL(blob);
+         const a = document.createElement('a');
+         a.href = url;
+         a.download = 'report.txt';
+         document.body.appendChild(a);
+         a.click();
+         a.remove();
+         URL.revokeObjectURL(url);
+     };
 </script>
 </body>
 </html>
