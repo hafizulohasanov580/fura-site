@@ -36,6 +36,8 @@
 
         .action-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; margin: 0 5px; }
         .edit-input { width: 100%; box-sizing: border-box; }
+        .month-selector { margin: 10px 0; text-align: center; }
+        select { background: #1e293b; border: 1px solid #334155; color: white; padding: 8px; border-radius: 10px; outline: none; }
     </style>
 </head>
 <body>
@@ -67,6 +69,11 @@
             <button class="btn-link" id="btn-logout" style="color:#ef4444;">Выход</button>
         </div>
 
+        <div class="month-selector">
+            <label for="month-select">Выберите месяц:</label>
+            <select id="month-select"></select>
+        </div>
+
         <div class="input-group">
             <input type="text" id="task" list="history" placeholder="Что сделали?">
             <datalist id="history"></datalist>
@@ -85,7 +92,7 @@
         </div>
 
         <div class="nav-btns">
-            <button class="btn-sec" id="btn-pdf">⬇️ Скачать TXT</button>
+            <button class="btn-sec" id="btn-pdf">⬇️ Скачать TXT за выбранный месяц</button>
         </div>
     </div>
 </div>
@@ -118,6 +125,9 @@
 
     let currentUser = null;
     let currentMonthYear = '';
+    let selectedMonthYear = '';
+    let allData = [];
+    let currentMonth = '';
 
     function formatNumber(num) {
         // безопасное форматирование числа, возвращаем '0' для нечисловых значений
@@ -194,57 +204,94 @@
             document.getElementById('task').value = "";
             document.getElementById('price').value = "";
             document.getElementById('task').focus();
+            // После добавления переключить на текущий месяц и обновить
+            selectedMonthYear = currentMonth;
+            document.getElementById('month-select').value = currentMonth;
+            updateDisplay();
         }
     };
 
     function loadData(uid) {
         const q = query(collection(db, "expenses"), orderBy("date", "desc"));
         onSnapshot(q, (snap) => {
-            const body = document.getElementById('table-body');
-            const history = document.getElementById('history');
-            body.innerHTML = "";
-            history.innerHTML = "";
-            let total = 0;
-            let words = new Set();
- 
+            allData = [];
             snap.forEach(docSnap => {
                 const d = docSnap.data();
                 if(d.uid === uid) {
-                    const dateObj = d.date.toDate();
-                    const dateStr = dateObj.toLocaleDateString();
-                    const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
- 
-                    // безопасный вывод суммы (если d.price некорректен — покажем 0)
-                    const priceNum = Number(d.price);
-                    const priceDisplay = isFinite(priceNum) ? formatNumber(priceNum) + ' смн' : '0 смн';
-                    const row = `<tr data-id="${docSnap.id}">
-                        <td>${dateStr} <br><span class="time-col">${timeStr}</span></td>
-                        <td>${d.desc}</td>
-                        <td>${priceDisplay}</td>
-                        <td>
-                            <button class="action-btn" onclick="editRow(this)">Изменить</button>
-                            <button class="action-btn" onclick="deleteRow('${docSnap.id}')">Удалить</button>
-                        </td>
-                    </tr>`;
-                    body.innerHTML += row;
-                    if (isFinite(priceNum)) total += priceNum;
-                     words.add(d.desc);
+                    allData.push({ id: docSnap.id, ...d });
                 }
             });
-
-            // Обновить текущий месяц/год на основе самой новой записи
-            if (snap.docs.length > 0) {
-                const latestDoc = snap.docs[0].data();
-                const dateObj = latestDoc.date.toDate();
-                const monthNames = ["ЯНВАРЯ", "ФЕВРАЛЯ", "МАРТА", "АПРЕЛЯ", "МАЯ", "ИЮНЯ", "ИЮЛЯ", "АВГУСТА", "СЕНТЯБРЯ", "ОКТЯБРЯ", "НОЯБРЯ", "ДЕКАБРЯ"];
-                currentMonthYear = monthNames[dateObj.getMonth()] + ' ' + dateObj.getFullYear();
-            } else {
-                currentMonthYear = '';
-            }
-
-            words.forEach(w => history.innerHTML += `<option value="${w}">`);
-            document.getElementById('total-sum').innerText = formatNumber(total) + " смн";
+            populateMonthSelector();
+            updateDisplay();
         });
+    }
+
+    function populateMonthSelector() {
+        const select = document.getElementById('month-select');
+        select.innerHTML = '';
+        const months = new Set();
+        allData.forEach(item => {
+            const dateObj = item.date.toDate();
+            const monthYear = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+            months.add(monthYear);
+        });
+        // Добавить текущий месяц, если нет данных
+        const now = new Date();
+        currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        months.add(currentMonth);
+
+        const sortedMonths = Array.from(months).sort().reverse();
+        sortedMonths.forEach(month => {
+            const option = document.createElement('option');
+            const [year, monthNum] = month.split('-');
+            const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+            option.value = month;
+            option.textContent = `${monthNames[parseInt(monthNum) - 1]} ${year}`;
+            select.appendChild(option);
+        });
+        // Установить текущий месяц по умолчанию
+        select.value = currentMonth;
+        selectedMonthYear = currentMonth;
+        select.onchange = () => {
+            selectedMonthYear = select.value;
+            updateDisplay();
+        };
+    }
+
+    function updateDisplay() {
+        const body = document.getElementById('table-body');
+        const history = document.getElementById('history');
+        body.innerHTML = "";
+        history.innerHTML = "";
+        let total = 0;
+        let words = new Set();
+
+        allData.forEach(item => {
+            const dateObj = item.date.toDate();
+            const monthYear = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+            if (monthYear === selectedMonthYear) {
+                const dateStr = dateObj.toLocaleDateString();
+                const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+                const priceNum = Number(item.price);
+                const priceDisplay = isFinite(priceNum) ? formatNumber(priceNum) + ' смн' : '0 смн';
+                const row = `<tr data-id="${item.id}">
+                    <td>${dateStr} <br><span class="time-col">${timeStr}</span></td>
+                    <td>${item.desc}</td>
+                    <td>${priceDisplay}</td>
+                    <td>
+                        <button class="action-btn" onclick="editRow(this)">Изменить</button>
+                        <button class="action-btn" onclick="deleteRow('${item.id}')">Удалить</button>
+                    </td>
+                </tr>`;
+                body.innerHTML += row;
+                if (isFinite(priceNum)) total += priceNum;
+                words.add(item.desc);
+            }
+        });
+
+        words.forEach(w => history.innerHTML += `<option value="${w}">`);
+        document.getElementById('total-sum').innerText = formatNumber(total) + " смн";
     }
 
     window.editRow = function(btn) {
@@ -294,43 +341,43 @@
     };
 
     document.getElementById('btn-pdf').onclick = () => {
-         if (!currentUser) { alert('Сначала войдите'); return; }
-         const title = currentMonthYear ? 'ОТЧЕТ ЗА ' + currentMonthYear : 'ОТЧЕТ МАСТЕРА';
-         const master = 'Мастер: ' + currentUser.displayName;
-         const lines = [];
-         lines.push(title);
-         lines.push(master);
-         lines.push('');
+        if (!currentUser) { alert('Сначала войдите'); return; }
+        const select = document.getElementById('month-select');
+        const selectedOption = select.options[select.selectedIndex];
+        const title = selectedOption ? 'ОТЧЕТ ЗА ' + selectedOption.textContent.toUpperCase() : 'ОТЧЕТ МАСТЕРА';
+        const master = 'Мастер: ' + currentUser.displayName;
+        const lines = [];
+        lines.push(title);
+        lines.push(master);
+        lines.push('');
         lines.push('Дата/Время\tОписание\tСумма (смн)');
-  
-         let totalNum = 0;
-  
-         document.querySelectorAll('#table-body tr').forEach(tr => {
-             const dateCell = (tr.cells[0] && tr.cells[0].innerText) ? tr.cells[0].innerText.replace(/\s+/g, ' ').trim() : '';
-             const desc = (tr.cells[1] && tr.cells[1].innerText) ? tr.cells[1].innerText.trim() : '';
-             const priceText = (tr.cells[2] && tr.cells[2].innerText) ? tr.cells[2].innerText.trim() : '';
-             // Удаляем нечисловые символы для суммирования
-             const numStr = priceText.replace(/[^\d,.\-]/g, '').replace(/\./g, '').replace(',', '.');
-             const num = parseFloat(numStr) || 0;
-             totalNum += num;
-            // В файл записываем только отображаемую сумму (без повторного числового столбца)
+
+        let totalNum = 0;
+
+        document.querySelectorAll('#table-body tr').forEach(tr => {
+            const dateCell = (tr.cells[0] && tr.cells[0].innerText) ? tr.cells[0].innerText.replace(/\s+/g, ' ').trim() : '';
+            const desc = (tr.cells[1] && tr.cells[1].innerText) ? tr.cells[1].innerText.trim() : '';
+            const priceText = (tr.cells[2] && tr.cells[2].innerText) ? tr.cells[2].innerText.trim() : '';
+            const numStr = priceText.replace(/[^\d,.\-]/g, '').replace(/\./g, '').replace(',', '.');
+            const num = parseFloat(numStr) || 0;
+            totalNum += num;
             lines.push(`${dateCell}\t${desc}\t${priceText}`);
-         });
-  
-         lines.push('');
-         const formattedTotal = formatNumber(totalNum) + ' смн';
-         lines.push('Итого: ' + formattedTotal);
-  
-         const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' });
-         const url = URL.createObjectURL(blob);
-         const a = document.createElement('a');
-         a.href = url;
-         a.download = 'report.txt';
-         document.body.appendChild(a);
-         a.click();
-         a.remove();
-         URL.revokeObjectURL(url);
-     };
+        });
+
+        lines.push('');
+        const formattedTotal = formatNumber(totalNum) + ' смн';
+        lines.push('Итого: ' + formattedTotal);
+
+        const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report_${selectedMonthYear}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    };
 </script>
 </body>
 </html>
